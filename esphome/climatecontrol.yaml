@@ -4,6 +4,10 @@ esphome:
 esp32:
   board: lolin32_lite
 
+globals:
+- id: rf_code_queue
+  type: std::vector<std::string>
+
 logger:
 
 api:
@@ -29,8 +33,9 @@ i2c:
 bme680_bsec:
     address: 0x77
     iaq_mode: static
-    temperature_offset: 6
-    state_save_interval: 6h    
+    temperature_offset: 4
+    #sample_rate: ulp
+    state_save_interval: 6h 
     
 sensor:
   - platform: bme680_bsec
@@ -54,7 +59,6 @@ text_sensor:
     iaq_accuracy:
       name: "IAQ Accuracy"
       
-      
 ###################################################
 output: 
   - platform: template
@@ -68,38 +72,45 @@ remote_transmitter:
   carrier_duty_percent: 100%
   
 ################################################################################
+script:
+  - id: send_command
+    mode: queued
+    then: 
+      if:
+        condition: 
+          lambda: return !id(rf_code_queue).empty();
+        then:
+          - remote_transmitter.transmit_rc_switch_raw:
+                code: !lambda |-
+                  std::string rf_code = id(rf_code_queue).front();
+                  id(rf_code_queue).erase(id(rf_code_queue).begin());
+                  return rf_code;
+                protocol: 
+                  pulse_length: 363
+                  sync: [36, 1]
+                  zero: [1, 2]
+                  one: [2, 1]
+                  inverted: true
+                repeat:
+                  times: 10
+                  wait_time: 47us
+          - delay: 225ms
+
+################################################################################
 ##LIGHTS
 button:
   - platform: template
     name: "Livingroom Fan Light"
     on_press:
       - logger.log: "Sending livingroom fan light"
-      - remote_transmitter.transmit_rc_switch_raw:
-          code: '111010110101011011010100'
-          protocol: 
-            pulse_length: 363
-            sync: [36, 1]
-            zero: [1, 2]
-            one: [2, 1]
-            inverted: true
-          repeat:
-            times: 10
-            wait_time: 47us
+      - lambda: id(rf_code_queue).push_back("111010110101011011010100");
+      - script.execute: send_command
   - platform: template
     name: "Bedroom Fan Light"
     on_press:
       - logger.log: "Sending bedroom fan light"
-      - remote_transmitter.transmit_rc_switch_raw:
-          code: '000101000111100011010100'
-          protocol: 
-            pulse_length: 363
-            sync: [36, 1]
-            zero: [1, 2]
-            one: [2, 1]
-            inverted: true
-          repeat:
-            times: 10
-            wait_time: 47us
+      - lambda: id(rf_code_queue).push_back("000101000111100011010100");
+      - script.execute: send_command
 
 ################################################################################
 ##FANS
@@ -112,68 +123,32 @@ fan:
     on_turn_on:
     - logger.log: "Livingroom Fan Turned On"
     on_speed_set:
-    - logger.log: "Livingroom Fan Speed was changed"
+    - logger.log: "Livingroom Fan Speed changed"
     - if:
         condition:
           lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 1);
         then:
           - logger.log: "Sending livingroom fan speed LOW"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '111010110101011010000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("111010110101011010000101");
+          - script.execute: send_command
     - if:
         condition:
           lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 2);
         then:
           - logger.log: "Sending livingroom fan speed MEDIUM"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '111010110101011001000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("111010110101011001000101");
+          - script.execute: send_command
     - if:
         condition:
           lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 3);
         then:
           - logger.log: "Sending livingroom fan speed HIGH"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '111010110101011011000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("111010110101011011000101");
+          - script.execute: send_command
     on_turn_off:
     - logger.log: "Livingroom Fan Turned Off"
-    - remote_transmitter.transmit_rc_switch_raw:
-        code: '111010110101011000010101'
-        protocol: 
-          pulse_length: 363
-          sync: [36, 1]
-          zero: [1, 2]
-          one: [2, 1]
-          inverted: true
-        repeat:
-          times: 10
-          wait_time: 47us
+    - lambda: id(rf_code_queue).push_back("111010110101011000010101");
+    - script.execute: send_command
 
   - platform: speed
     output: dummy_nothing
@@ -189,59 +164,23 @@ fan:
           lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 1);
         then:
           - logger.log: "Sending bedroom fan speed LOW"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '000101000111100010000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("000101000111100010000101");
+          - script.execute: send_command
     - if:
         condition:
           lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 2);
         then:
           - logger.log: "Sending bedroom fan speed MEDIUM"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '000101000111100001000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("000101000111100001000101");
+          - script.execute: send_command
     - if:
         condition:
           lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 3);
         then:
           - logger.log: "Sending bedroom fan speed HIGH"
-          - remote_transmitter.transmit_rc_switch_raw:
-              code: '000101000111100011000101'
-              protocol: 
-                pulse_length: 363
-                sync: [36, 1]
-                zero: [1, 2]
-                one: [2, 1]
-                inverted: true
-              repeat:
-                times: 10
-                wait_time: 47us
+          - lambda: id(rf_code_queue).push_back("000101000111100011000101");
+          - script.execute: send_command
     on_turn_off:
     - logger.log: "Bedroom Fan Turned Off"
-    - remote_transmitter.transmit_rc_switch_raw:
-        code: '000101000111100000010101'
-        protocol: 
-          pulse_length: 363
-          sync: [36, 1]
-          zero: [1, 2]
-          one: [2, 1]
-          inverted: true
-        repeat:
-          times: 10
-          wait_time: 47us
+    - lambda: id(rf_code_queue).push_back("000101000111100000010101");
+    - script.execute: send_command
