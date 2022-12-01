@@ -1,0 +1,12 @@
+type: entities
+entities:
+  - entity: fan.livingroom_fan
+    type: custom:custom-fan-card
+    state_color: true
+  - entity: button.livingroom_fan_light
+  - entity: fan.bedroom_fan
+    type: custom:custom-fan-card
+    state_color: true
+  - entity: button.bedroom_fan_light
+title: Ceiling Fans
+show_header_toggle: false

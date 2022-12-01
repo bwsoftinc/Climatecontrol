@@ -1,0 +1,247 @@
+esphome:
+  name: climatecontrol
+
+esp32:
+  board: lolin32_lite
+
+logger:
+
+api:
+  encryption:
+    key: !secret key_145
+
+ota:
+  password: !secret ota_145
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: on
+  manual_ip:
+     static_ip: !secret ip_145
+     gateway: !secret gateway
+     subnet: !secret subnet
+
+i2c:
+  scl: GPIO23
+  sda: GPIO18
+
+bme680_bsec:
+    address: 0x77
+    iaq_mode: static
+    temperature_offset: 6
+    state_save_interval: 6h    
+    
+sensor:
+  - platform: bme680_bsec
+    temperature:
+      name: "Temperature"
+    pressure:
+      name: "Pressure"
+    humidity:
+      name: "Humidity"
+    gas_resistance:
+      name: "Gas Resistance"
+    iaq:
+      name: "Indoor Air Quality"
+    co2_equivalent:
+      name: "CO2 Equivalent"
+    breath_voc_equivalent:
+      name: "Breath VOC Equivalent"
+
+text_sensor:
+  - platform: bme680_bsec
+    iaq_accuracy:
+      name: "IAQ Accuracy"
+      
+      
+###################################################
+output: 
+  - platform: template
+    id: dummy_nothing
+    type: float
+    write_action: 
+      - lambda: ""
+      
+remote_transmitter:
+  pin: GPIO26
+  carrier_duty_percent: 100%
+  
+################################################################################
+##LIGHTS
+button:
+  - platform: template
+    name: "Livingroom Fan Light"
+    on_press:
+      - logger.log: "Sending livingroom fan light"
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '111010110101011011010100'
+          protocol: 
+            pulse_length: 363
+            sync: [36, 1]
+            zero: [1, 2]
+            one: [2, 1]
+            inverted: true
+          repeat:
+            times: 10
+            wait_time: 47us
+  - platform: template
+    name: "Bedroom Fan Light"
+    on_press:
+      - logger.log: "Sending bedroom fan light"
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '000101000111100011010100'
+          protocol: 
+            pulse_length: 363
+            sync: [36, 1]
+            zero: [1, 2]
+            one: [2, 1]
+            inverted: true
+          repeat:
+            times: 10
+            wait_time: 47us
+
+################################################################################
+##FANS
+fan:
+  - platform: speed
+    output: dummy_nothing
+    id: livingroom_fan
+    name: "Livingroom Fan"
+    speed_count: 3
+    on_turn_on:
+    - logger.log: "Livingroom Fan Turned On"
+    on_speed_set:
+    - logger.log: "Livingroom Fan Speed was changed"
+    - if:
+        condition:
+          lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 1);
+        then:
+          - logger.log: "Sending livingroom fan speed LOW"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '111010110101011010000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    - if:
+        condition:
+          lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 2);
+        then:
+          - logger.log: "Sending livingroom fan speed MEDIUM"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '111010110101011001000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    - if:
+        condition:
+          lambda: return (id(livingroom_fan).state == 1 && id(livingroom_fan).speed == 3);
+        then:
+          - logger.log: "Sending livingroom fan speed HIGH"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '111010110101011011000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    on_turn_off:
+    - logger.log: "Livingroom Fan Turned Off"
+    - remote_transmitter.transmit_rc_switch_raw:
+        code: '111010110101011000010101'
+        protocol: 
+          pulse_length: 363
+          sync: [36, 1]
+          zero: [1, 2]
+          one: [2, 1]
+          inverted: true
+        repeat:
+          times: 10
+          wait_time: 47us
+
+  - platform: speed
+    output: dummy_nothing
+    id: bedroom_fan
+    name: "Bedroom Fan"
+    speed_count: 3
+    on_turn_on:
+    - logger.log: "Bedroom Fan Turned On"
+    on_speed_set:
+    - logger.log: "Bedroom Fan Speed was changed"
+    - if:
+        condition:
+          lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 1);
+        then:
+          - logger.log: "Sending bedroom fan speed LOW"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '000101000111100010000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    - if:
+        condition:
+          lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 2);
+        then:
+          - logger.log: "Sending bedroom fan speed MEDIUM"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '000101000111100001000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    - if:
+        condition:
+          lambda: return (id(bedroom_fan).state == 1 && id(bedroom_fan).speed == 3);
+        then:
+          - logger.log: "Sending bedroom fan speed HIGH"
+          - remote_transmitter.transmit_rc_switch_raw:
+              code: '000101000111100011000101'
+              protocol: 
+                pulse_length: 363
+                sync: [36, 1]
+                zero: [1, 2]
+                one: [2, 1]
+                inverted: true
+              repeat:
+                times: 10
+                wait_time: 47us
+    on_turn_off:
+    - logger.log: "Bedroom Fan Turned Off"
+    - remote_transmitter.transmit_rc_switch_raw:
+        code: '000101000111100000010101'
+        protocol: 
+          pulse_length: 363
+          sync: [36, 1]
+          zero: [1, 2]
+          one: [2, 1]
+          inverted: true
+        repeat:
+          times: 10
+          wait_time: 47us
